@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="description" content="1024 — 滑动合并，挑战 1024。">
+<title>1024 · 滑动合并</title>
+<style>
+  :root{
+    --canvas:#111827;
+    --surface:#202B3C;
+    --field:#F4F0E8;
+    --cell:#E4DED3;
+    --ink:#202B3C;
+    --ink-light:#F4F0E8;
+    --line:#C9C0B3;
+    --volt:#FF5A36;
+    --warn:#D88935;
+    --gold:#F2C14E;
+
+    --gap:8px;
+    --pad:8px;
+    --board:min(calc(100vw - 32px), calc(100vh - 312px), 420px);
+    --cell-size:calc((var(--board) - var(--pad) * 2 - var(--gap) * 3) / 4);
+
+    --ease-snap:cubic-bezier(.22,.8,.24,1);
+    --ease-pop:cubic-bezier(.2,.9,.3,1.2);
+    --font:Arial,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  @supports (height:100svh){
+    :root{ --board:min(calc(100vw - 32px), calc(100svh - 312px), 420px); }
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  html,body{
+    height:100%;
+    overflow:hidden;
+    overscroll-behavior:none;
+    background:var(--canvas);
+    color:var(--ink-light);
+    font-family:var(--font);
+    -webkit-text-size-adjust:100%;
+    -webkit-tap-highlight-color:transparent;
+  }
+  body{
+    display:flex;
+    justify-content:center;
+    touch-action:manipulation;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+
+  .app{
+    width:100%;
+    max-width:480px;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    padding:16px 16px 24px;
+    padding-top:max(16px, env(safe-area-inset-top));
+    padding-bottom:max(24px, env(safe-area-inset-bottom));
+  }
+
+  /* ---------- header ---------- */
+  .header{
+    height:72px;
+    flex:0 0 72px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .brand{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .wordmark{
+    font-size:13px;font-weight:700;line-height:16px;
+    letter-spacing:.16em;color:var(--ink-light);
+    display:flex;align-items:center;gap:8px;
+  }
+  .mark{width:14px;height:14px;display:block;flex:0 0 auto}
+  .tagline{
+    font-size:12px;font-weight:400;line-height:18px;
+    color:rgba(244,240,232,.58);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .tools{display:flex;gap:8px;flex:0 0 auto}
+
+  .icon-btn{
+    width:44px;height:44px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:2px;
+    background:transparent;
+    border:1px solid rgba(244,240,232,.22);
+    color:var(--ink-light);
+    cursor:pointer;
+    transition:background 120ms linear,border-color 120ms linear;
+  }
+  .icon-btn:active{background:rgba(244,240,232,.12);border-color:rgba(244,240,232,.42)}
+  .icon-btn:focus-visible{outline:2px solid var(--volt);outline-offset:2px}
+
+  /* ---------- score rail ---------- */
+  .rail{
+    height:88px;flex:0 0 88px;
+    background:var(--surface);
+    border-radius:8px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    overflow:hidden;
+  }
+  .rail-cell{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:6px;
+    border-left:1px solid rgba(244,240,232,.13);
+  }
+  .rail-cell:first-child{border-left:0}
+  .rail-label{
+    font-size:11px;font-weight:700;line-height:14px;
+    letter-spacing:.14em;color:rgba(244,240,232,.52);
+  }
+  .rail-val{
+    font-size:30px;font-weight:700;line-height:32px;
+    color:var(--ink-light);
+    font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;
+  }
+  .rail-val.is-hot{color:var(--volt)}
+
+  /* ---------- stage / board ---------- */
+  .stage{
+    flex:1 1 auto;min-height:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .board-frame{
+    position:relative;
+    width:var(--board);
+    height:var(--board);
+    flex:0 0 auto;
+  }
+  .tab{
+    position:absolute;top:-12px;right:-12px;
+    width:22%;aspect-ratio:1/1;
+    background:var(--volt);
+    border-radius:2px;
+    z-index:0;
+  }
+  .board{
+    position:relative;z-index:1;
+    width:100%;height:100%;
+    background:var(--field);
+    border-radius:8px;
+    overflow:hidden;
+    touch-action:none;
+  }
+  .cells{
+    position:absolute;inset:var(--pad);
+    display:grid;
+    grid-template-columns:repeat(4,var(--cell-size));
+    grid-template-rows:repeat(4,var(--cell-size));
+    gap:var(--gap);
+  }
+  .cells i{background:var(--cell);border-radius:4px;display:block}
+  .tiles{position:absolute;inset:0}
+
+  /* ---------- tiles ---------- */
+  .tile{
+    position:absolute;
+    top:var(--pad);left:var(--pad);
+    width:var(--cell-size);height:var(--cell-size);
+    transform:translate(
+      calc(var(--x) * (var(--cell-size) + var(--gap))),
+      calc(var(--y) * (var(--cell-size) + var(--gap)))
+    );
+    transition:transform 110ms var(--ease-snap);
+    will-change:transform;
+  }
+  .tile-face{
+    position:relative;
+    width:100%;height:100%;
+    border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--surface);
+    color:var(--ink-light);
+    overflow:hidden;
+  }
+  .tile-num{
+    font-size:calc(var(--cell-size) * .36);
+    font-weight:700;line-height:1;
+    letter-spacing:-.015em;
+    font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;
+  }
+  .tile[data-len="5"] .tile-num,
+  .tile[data-len="6"] .tile-num,
+  .tile[data-len="7"] .tile-num{font-size:calc(var(--cell-size) * .25)}
+  .tile[data-v="1024"] .tile-num{font-size:calc(var(--cell-size) * .38)}
+
+  .tile[data-v="2"]    .tile-face{background:#D8CFC0;color:#202B3C}
+  .tile[data-v="4"]    .tile-face{background:#C9C0B3;color:#202B3C}
+  .tile[data-v="8"]    .tile-face{background:#202B3C;color:#F4F0E8}
+  .tile[data-v="16"]   .tile-face{background:#2B3849;color:#F4F0E8}
+  .tile[data-v="32"]   .tile-face{background:#354355;color:#F4F0E8}
+  .tile[data-v="64"]   .tile-face{background:#404F62;color:#F4F0E8}
+  .tile[data-v="128"]  .tile-face{background:#C7962F;color:#202B3C}
+  .tile[data-v="256"]  .tile-face{background:#E0AC3C;color:#202B3C}
+  .tile[data-v="512"]  .tile-face{background:#D88935;color:#202B3C}
+  .tile[data-v="1024"] .tile-face{background:#FF5A36;color:#111827}
+  .tile[data-v="2048"] .tile-face{background:#F04F3E;color:#111827}
+  .tile[data-v="big"]  .tile-face{background:#B8242C;color:#F4F0E8}
+
+  .tile.is-new .tile-face{animation:spawn 140ms var(--ease-pop) 8ms both}
+  @keyframes spawn{
+    from{transform:scale(.82);opacity:0}
+    to{transform:scale(1);opacity:1}
+  }
+  .tile.is-merge .tile-face{animation:pulse 160ms var(--ease-pop)}
+  @keyframes pulse{
+    0%{transform:scale(1)}
+    50%{transform:scale(1.08)}
+    100%{transform:scale(1)}
+  }
+  .tile.is-glow .tile-face{animation:glow 220ms ease-out}
+  @keyframes glow{
+    0%{box-shadow:0 0 0 0 rgba(242,193,78,0)}
+    38%{box-shadow:0 0 0 6px rgba(242,193,78,.62)}
+    100%{box-shadow:0 0 0 0 rgba(242,193,78,0)}
+  }
+  .cele-sq{
+    position:absolute;inset:-3px;
+    background:var(--volt);
+    border-radius:4px;
+    animation:cele 420ms var(--ease-snap) forwards;
+  }
+  @keyframes cele{
+    0%{transform:none;opacity:.95}
+    55%{opacity:.95}
+    100%{transform:translateY(-42px) rotate(90deg) scale(1.18);opacity:0}
+  }
+
+  /* ---------- action band ---------- */
+  .actions{flex:0 0 auto;display:flex;flex-direction:column;gap:12px}
+  .progress{
+    height:2px;width:100%;
+    background:rgba(244,240,232,.12);
+    border-radius:2px;
+    overflow:hidden;
+  }
+  .progress i{
+    display:block;height:100%;width:100%;
+    background:var(--volt);
+    transform-origin:left center;
+    transform:scaleX(.1);
+    transition:transform 160ms linear;
+  }
+  .action-row{display:flex;gap:12px}
+
+  .btn{
+    height:44px;
+    flex:1 1 0;
+    min-width:132px;
+    border-radius:2px;
+    font-family:var(--font);
+    font-size:14px;font-weight:700;line-height:1;
+    letter-spacing:.04em;
+    cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    transition:transform 90ms var(--ease-snap),background 120ms linear;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn:focus-visible{outline:2px solid var(--volt);outline-offset:3px}
+  .btn-primary{background:var(--volt);color:#111827;border:0}
+  .btn-secondary{
+    background:transparent;color:var(--ink-light);
+    border:1px solid rgba(244,240,232,.5);
+  }
+
+  /* ---------- overlay / sheet ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:20;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .overlay[hidden]{display:none}
+  .backdrop{position:absolute;inset:0;background:rgba(17,24,39,.62)}
+  .sheet{
+    position:relative;
+    width:min(320px,100%);
+    background:var(--field);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:2px;
+    box-shadow:0 12px 32px rgba(17,24,39,.24);
+    padding:24px 20px 20px;
+    display:flex;flex-direction:column;gap:16px;
+    animation:rise 320ms var(--ease-snap) both;
+  }
+  @keyframes rise{
+    from{transform:translateY(24px);opacity:0}
+    to{transform:translateY(0);opacity:1}
+  }
+  .sheet-title{font-size:20px;font-weight:700;line-height:1.15;letter-spacing:.02em}
+  .sheet-sub{font-size:12px;line-height:18px;color:rgba(32,43,60,.7)}
+  .sheet-metrics{
+    display:grid;grid-template-columns:1fr 1fr;
+    border-top:1px solid rgba(32,43,60,.16);
+    border-bottom:1px solid rgba(32,43,60,.16);
+  }
+  .metric{
+    padding:14px 4px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    border-left:1px solid rgba(32,43,60,.16);
+  }
+  .metric:first-child{border-left:0}
+  .metric-label{font-size:11px;font-weight:700;letter-spacing:.14em;color:rgba(32,43,60,.6)}
+  .metric-val{
+    font-size:30px;font-weight:700;line-height:32px;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  }
+  .metric-val.is-hot{color:#D93B21}
+  .sheet-actions{display:flex;flex-direction:column;gap:10px}
+  .sheet .btn{width:100%}
+  .sheet .btn-primary{background:var(--volt);color:#111827}
+  .sheet .btn-secondary{
+    background:transparent;color:var(--ink);
+    border:1px solid rgba(32,43,60,.42);
+  }
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed;left:50%;bottom:112px;
+    transform:translate(-50%,8px);
+    background:var(--surface);
+    color:var(--ink-light);
+    border:1px solid rgba(244,240,232,.18);
+    border-radius:2px;
+    padding:10px 16px;
+    font-size:12px;line-height:18px;letter-spacing:.06em;
+    opacity:0;pointer-events:none;
+    transition:opacity 160ms linear,transform 160ms var(--ease-snap);
+    z-index:30;
+    max-width:calc(100vw - 48px);
+    text-align:center;
+  }
+  .toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce){
+    .tile{transition:none}
+    .tile.is-new .tile-face,
+    .tile.is-merge .tile-face,
+    .tile.is-glow .tile-face,
+    .cele-sq{animation:none !important}
+    .tile.is-glow .tile-face{outline:1px solid var(--volt);outline-offset:2px}
+    .sheet{animation:none}
+    .progress i{transition:none}
+    .btn:active{transform:none}
+    .toast{transition:opacity 1ms linear}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <span class="wordmark">
+        <svg class="mark" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="0" y="0" width="7" height="7" fill="#202B3C"></rect>
+          <rect x="9" y="0" width="7" height="7" fill="#F4F0E8"></rect>
+          <rect x="0" y="9" width="7" height="7" fill="#F4F0E8"></rect>
+          <rect x="9" y="9" width="7" height="7" fill="#FF5A36"></rect>
+        </svg>
+        1024
+      </span>
+      <span class="tagline">滑动合并，挑战 1024</span>
+    </div>
+
+    <div class="tools">
+      <button class="icon-btn" id="btnNewTop" type="button" aria-label="新游戏">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"></path>
+          <path d="M20.5 4v5h-5"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="btnShareTop" type="button" aria-label="分享结果">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="18" cy="5.5" r="2.5"></circle>
+          <circle cx="6" cy="12" r="2.5"></circle>
+          <circle cx="18" cy="18.5" r="2.5"></circle>
+          <path d="M8.2 10.8 15.8 6.7"></path>
+          <path d="M8.2 13.2 15.8 17.3"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="rail" aria-label="分数">
+    <div class="rail-cell">
+      <span class="rail-label">分数</span>
+      <span class="rail-val" id="scoreVal">0</span>
+    </div>
+    <div class="rail-cell">
+      <span class="rail-label">最高</span>
+      <span class="rail-val" id="bestVal">0</span>
+    </div>
+    <div class="rail-cell">
+      <span class="rail-label">最高块</span>
+      <span class="rail-val" id="maxVal">2</span>
+    </div>
+  </section>
+
+  <main class="stage">
+    <div class="board-frame">
+      <div class="tab" aria-hidden="true"></div>
+      <div class="board" id="board" role="application" tabindex="0"
+           aria-label="1024 游戏棋盘，4 乘 4 网格，当前分数 0">
+        <div class="cells" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <div class="tiles" id="tiles"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="actions">
+    <div class="progress" aria-hidden="true"><i id="progressFill"></i></div>
+    <div class="action-row">
+      <button class="btn btn-primary" id="btnNew" type="button">新游戏</button>
+      <button class="btn btn-secondary" id="btnContinue" type="button">继续挑战</button>
+    </div>
+  </footer>
+
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="backdrop" id="backdrop"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 class="sheet-title" id="sheetTitle"></h2>
+    <p class="sheet-sub" id="sheetSub"></p>
+    <div class="sheet-metrics">
+      <div class="metric">
+        <span class="metric-label" id="mLabel1">你的分数</span>
+        <span class="metric-val" id="mVal1">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label" id="mLabel2">最高块</span>
+        <span class="metric-val" id="mVal2">2</span>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="sheetPrimary" type="button"></button>
+      <button class="btn btn-secondary" id="sheetSecondary" type="button"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<p class="sr-only" id="live" aria-live="polite"></p>
+
+<script>
+(function () {
+  'use strict';
+
+  var SIZE = 4;
+  var DUR_MOVE = 110, DUR_SPAWN = 140, DUR_MERGE = 160, DUR_SCORE = 180, DUR_GLOW = 220;
+  var SWIPE_MIN = 18;
+  var BEST_KEY = 'best_1024_score';
+
+  var VEC = {
+    up: [-1, 0],
+    down: [1, 0],
+    left: [0, -1],
+    right: [0, 1]
+  };
+
+  var reducedQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function isReduced() { return !!(reducedQuery && reducedQuery.matches); }
+
+  var boardEl = document.getElementById('board');
+  var tilesEl = document.getElementById('tiles');
+  var scoreEl = document.getElementById('scoreVal');
+  var bestEl = document.getElementById('bestVal');
+  var maxEl = document.getElementById('maxVal');
+  var progressFill = document.getElementById('progressFill');
+  var liveEl = document.getElementById('live');
+  var toastEl = document.getElementById('toast');
+
+  var overlay = document.getElementById('overlay');
+  var backdrop = document.getElementById('backdrop');
+  var sheetTitle = document.getElementById('sheetTitle');
+  var sheetSub = document.getElementById('sheetSub');
+  var mLabel1 = document.getElementById('mLabel1');
+  var mVal1 = document.getElementById('mVal1');
+  var mLabel2 = document.getElementById('mLabel2');
+  var mVal2 = document.getElementById('mVal2');
+  var sheetPrimary = document.getElementById('sheetPrimary');
+  var sheetSecondary = document.getElementById('sheetSecondary');
+
+  var grid = [];
+  var seq = 0;
+  var score = 0;
+  var best = 0;
+  var maxTile = 2;
+  var busy = false;
+  var sheetOpen = false;
+  var milestoneShown = false;
+  var toastTimer = null;
+
+  /* ---------------- storage ---------------- */
+  function loadBest() {
+    try {
+      var v = window.localStorage.getItem(BEST_KEY);
+      if (v !== null && !isNaN(parseInt(v, 10))) return parseInt(v, 10);
+    } catch (e) {}
+    return 0;
+  }
+  function saveBest() {
+    try { window.localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+  }
+
+  /* ---------------- tiles ---------------- */
+  function emptyGrid() {
+    var g = [], r, c, row;
+    for (r = 0; r < SIZE; r++) {
+      row = [];
+      for (c = 0; c < SIZE; c++) row.push(null);
+      g.push(row);
+    }
+    return g;
+  }
+
+  function valueKey(v) {
+    return v <= 2048 ? String(v) : 'big';
+  }
+
+  function setPos(tile) {
+    tile.el.style.setProperty('--x', tile.c);
+    tile.el.style.setProperty('--y', tile.r);
+  }
+
+  function makeTile(value, r, c, isNew) {
+    var el = document.createElement('div');
+    el.className = 'tile' + (isNew && !isReduced() ? ' is-new' : '');
+    el.setAttribute('data-v', valueKey(value));
+    el.setAttribute('data-len', String(String(value).length));
+    el.innerHTML = '<div class="tile-face"><span class="tile-num"></span></div>';
+    el.querySelector('.tile-num').textContent = String(value);
+    var tile = {
+      id: ++seq,
+      value: value,
+      newValue: value,
+      r: r,
+      c: c,
+      el: el,
+      mergedThisTurn: false,
+      dead: false
+    };
+    setPos(tile);
+    tilesEl.appendChild(el);
+    return tile;
+  }
+
+  function spawn() {
+    var empty = [], r, c;
+    for (r = 0; r < SIZE; r++) {
+      for (c = 0; c < SIZE; c++) {
+        if (!grid[r][c]) empty.push([r, c]);
+      }
+    }
+    if (!empty.length) return null;
+    var pick = empty[Math.floor(Math.random() * empty.length)];
+    var value = Math.random() < 0.9 ? 2 : 4;
+    var tile = makeTile(value, pick[0], pick[1], true);
+    grid[pick[0]][pick[1]] = tile;
+    return tile;
+  }
+
+  /* ---------------- hud ---------------- */
+  function updateHUD() {
+    maxEl.textContent = String(maxTile);
+    if (maxTile >= 1024) maxEl.classList.add('is-hot');
+    else maxEl.classList.remove('is-hot');
+
+    var p = Math.log(Math.max(2, maxTile)) / Math.LN2 / 10;
+    if (p < 0.06) p = 0.06;
+    if (p > 1) p = 1;
+    progressFill.style.transform = 'scaleX(' + p + ')';
+
+    boardEl.setAttribute(
+      'aria-label',
+      '1024 游戏棋盘，4 乘 4 网格，当前分数 ' + score + '，最高块 ' + maxTile
+    );
+  }
+
+  function announce() {
+    liveEl.textContent = '分数 ' + score + '，最高块 ' + maxTile;
+  }
+
+  function addScore(points) {
+    if (!points) return;
+    var from = score;
+    var to = score + points;
+    score = to;
+    if (to > best) { best = to; saveBest(); }
+
+    if (isReduced()) {
+      scoreEl.textContent = String(to);
+      bestEl.textContent = String(best);
+      announce();
+      return;
+    }
+
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    function step(now) {
+      var k = Math.min(1, (now - t0) / DUR_SCORE);
+      var e = 1 - Math.pow(1 - k, 3);
+      scoreEl.textContent = String(Math.round(from + (to - from) * e));
+      bestEl.textContent = String(best);
+      if (k < 1) window.requestAnimationFrame(step);
+      else {
+        scoreEl.textContent = String(to);
+        announce();
+      }
+    }
+    window.requestAnimationFrame(step);
+  }
+
+  /* ---------------- toast ---------------- */
+  function toast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add('is-on');
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(function () {
+      toastEl.classList.remove('is-on');
+    }, 1800);
+  }
+
+  /* ---------------- sheet ---------------- */
+  function openSheet(config) {
+    sheetTitle.textContent = config.title;
+    if (config.sub) {
+      sheetSub.textContent = config.sub;
+      sheetSub.style.display = '';
+    } else {
+      sheetSub.textContent = '';
+      sheetSub.style.display = 'none';
+    }
+    mLabel1.textContent = config.label1;
+    mVal1.textContent = config.value1;
+    mLabel2.textContent = config.label2;
+    mVal2.textContent = config.value2;
+    mVal2.classList.toggle('is-hot', maxTile >= 1024);
+
+    sheetPrimary.textContent = config.primaryLabel;
+    sheetSecondary.textContent = config.secondaryLabel;
+
+    sheetPrimary.onclick = function () {
+      closeSheet();
+      config.onPrimary();
+    };
+    sheetSecondary.onclick = function () {
+      closeSheet();
+      config.onSecondary();
+    };
+
+    overlay.hidden = false;
+    sheetOpen = true;
+    // restart rise animation
+    var sheet = overlay.querySelector('.sheet');
+    sheet.style.animation = 'none';
+    void sheet.offsetWidth;
+    sheet.style.animation = '';
+  }
+
+  function closeSheet() {
+    overlay.hidden = true;
+    sheetOpen = false;
+  }
+
+  function showMilestoneSheet() {
+    openSheet({
+      title: '1024 达成',
+      sub: '继续冲 2048',
+      label1: '你的分数',
+      value1: String(score),
+      label2: '最高块',
+      value2: String(maxTile),
+      primaryLabel: '继续挑战',
+      secondaryLabel: '把结果发给朋友',
+      onPrimary: function () {
+        if (isGameOver()) window.setTimeout(showGameOverSheet, 120);
+      },
+      onSecondary: function () {
+        shareResult();
+        if (isGameOver()) window.setTimeout(showGameOverSheet, 400);
+      }
+    });
+  }
+
+  function showGameOverSheet() {
+    openSheet({
+      title: '本局结束',
+      sub: '和朋友比一比，谁先合成 1024。',
+      label1: '你的分数',
+      value1: String(score),
+      label2: '最高块',
+      value2: String(maxTile),
+      primaryLabel: '再来一局',
+      secondaryLabel: '把结果发给朋友',
+      onPrimary: function () { newGame(); },
+      onSecondary: function () { shareResult(); }
+    });
+  }
+
+  /* ---------------- celebration ---------------- */
+  function celebrate(tile) {
+    toast('里程碑 · 1024 达成');
+
+    if (tile && !isReduced()) {
+      var face = tile.el.querySelector('.tile-face');
+      var sq = document.createElement('div');
+      sq.className = 'cele-sq';
+      face.appendChild(sq);
+      window.setTimeout(function () {
+        if (sq.parentNode) sq.parentNode.removeChild(sq);
+      }, 480);
+
+      tile.el.classList.remove('is-glow');
+      void tile.el.offsetWidth;
+      tile.el.classList.add('is-glow');
+      window.setTimeout(function () {
+        tile.el.classList.remove('is-glow');
+      }, DUR_GLOW + 60);
+    }
+
+    window.setTimeout(showMilestoneSheet, isReduced() ? 0 : 320);
+  }
+
+  /* ---------------- game logic ---------------- */
+  function findFarthest(r, c, dr, dc) {
+    var pr = r, pc = c, nr, nc;
+    while (true) {
+      nr = pr + dr;
+      nc = pc + dc;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
+      if (grid[nr][nc]) break;
+      pr = nr;
+      pc = nc;
+    }
+    var nextR = pr + dr, nextC = pc + dc;
+    var next = (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE)
+      ? { r: nextR, c: nextC }
+      : null;
+    return { far: { r: pr, c: pc }, next: next };
+  }
+
+  function buildTraversals(dr, dc) {
+    var rows = [0, 1, 2, 3];
+    var cols = [0, 1, 2, 3];
+    if (dr === 1) rows.reverse();
+    if (dc === 1) cols.reverse();
+    return { rows: rows, cols: cols };
+  }
+
+  function isGameOver() {
+    var r, c, v;
+    for (r = 0; r < SIZE; r++) {
+      for (c = 0; c < SIZE; c++) {
+        if (!grid[r][c]) return false;
+        v = grid[r][c].value;
+        if (c + 1 < SIZE && grid[r][c + 1] && grid[r][c + 1].value === v) return false;
+        if (r + 1 < SIZE && grid[r + 1][c] && grid[r + 1][c].value === v) return false;
+      }
+    }
+    return true;
+  }
+
+  function move(dir) {
+    if (busy || sheetOpen || !VEC[dir]) return;
+
+    var vector = VEC[dir];
+    var dr = vector[0], dc = vector[1];
+    var tr = buildTraversals(dr, dc);
+    var moved = false;
+    var gained = 0;
+    var absorbed = [];
+    var merged = [];
+    var milestoneTile = null;
+    var r, c, i, j;
+
+    for (r = 0; r < SIZE; r++) {
+      for (c = 0; c < SIZE; c++) {
+        if (grid[r][c]) {
+          grid[r][c].mergedThisTurn = false;
+          grid[r][c].newValue = grid[r][c].value;
+        }
+      }
+    }
+
+    for (i = 0; i < tr.rows.length; i++) {
+      for (j = 0; j < tr.cols.length; j++) {
+        r = tr.rows[i];
+        c = tr.cols[j];
+        var tile = grid[r][c];
+        if (!tile || tile.dead) continue;
+
+        var res = findFarthest(r, c, dr, dc);
+        var nextTile = res.next ? grid[res.next.r][res.next.c] : null;
+
+        if (nextTile && !nextTile.dead && nextTile.value === tile.value && !nextTile.mergedThisTurn) {
+          grid[r][c] = null;
+          tile.r = nextTile.r;
+          tile.c = nextTile.c;
+          tile.dead = true;
+          nextTile.mergedThisTurn = true;
+          nextTile.newValue = nextTile.value * 2;
+          absorbed.push(tile);
+          merged.push(nextTile);
+          gained += nextTile.newValue;
+          moved = true;
+          setPos(tile);
+        } else if (res.far.r !== r || res.far.c !== c) {
+          grid[r][c] = null;
+          grid[res.far.r][res.far.c] = tile;
+          tile.r = res.far.r;
+          tile.c = res.far.c;
+          moved = true;
+          setPos(tile);
+        }
+      }
+    }
+
+    if (!moved) return;
+
+    busy = true;
+    var travel = isReduced() ? 0 : DUR_MOVE;
+
+    window.setTimeout(function () {
+      var k;
+
+      for (k = 0; k < absorbed.length; k++) {
+        if (absorbed[k].el.parentNode) absorbed[k].el.parentNode.removeChild(absorbed[k].el);
+      }
+
+      for (k = 0; k < merged.length; k++) {
+        var t = merged[k];
+        t.value = t.newValue;
+        t.el.setAttribute('data-v', valueKey(t.value));
+        t.el.setAttribute('data-len', String(String(t.value).length));
+        t.el.querySelector('.tile-num').textContent = String(t.value);
+
+        if (!isReduced()) {
+          t.el.classList.remove('is-merge');
+          void t.el.offsetWidth;
+          t.el.classList.add('is-merge');
+          (function (node) {
+            window.setTimeout(function () { node.classList.remove('is-merge'); }, DUR_MERGE + 40);
+          })(t.el);
+        }
+
+        if (t.value > maxTile) maxTile = t.value;
+        if (t.value >= 1024 && !milestoneShown) milestoneTile = t;
+      }
+
+      addScore(gained);
+      spawn();
+      updateHUD();
+      busy = false;
+
+      if (milestoneTile) {
+        milestoneShown = true;
+        celebrate(milestoneTile);
+      } else if (isGameOver()) {
+        window.setTimeout(showGameOverSheet, isReduced() ? 0 : 220);
+      }
+    }, travel);
+  }
+
+  /* ---------------- new game ---------------- */
+  function newGame() {
+    tilesEl.innerHTML = '';
+    grid = emptyGrid();
+    score = 0;
+    maxTile = 2;
+    busy = false;
+    milestoneShown = false;
+    closeSheet();
+
+    scoreEl.textContent = '0';
+    bestEl.textContent = String(best);
+
+    spawn();
+    spawn();
+    updateHUD();
+    announce();
+    boardEl.focus();
+  }
+
+  /* ---------------- share ---------------- */
+  function shareText() {
+    return '我的 1024 分数：' + score + '，最高块：' + maxTile + '。来一局？';
+  }
+
+  function copyText(text) {
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        var ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast(ok ? '分数已复制' : text);
+      } catch (e) {
+        toast(text);
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast('分数已复制');
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function shareResult() {
+    var text = shareText();
+    if (navigator.share) {
+      navigator.share({ title: '1024', text: text }).catch(function () {
+        copyText(text);
+      });
+    } else {
+      copyText(text);
+    }
+  }
+
+  /* ---------------- input ---------------- */
+  var touchId = null, startX = 0, startY = 0;
+
+  boardEl.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { touchId = null; return; }
+    touchId = e.touches[0].identifier;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  boardEl.addEventListener('touchmove', function (e) {
+    if (touchId !== null) e.preventDefault();
+  }, { passive: false });
+
+  boardEl.addEventListener('touchend', function (e) {
+    if (touchId === null) return;
+    var i, t = null;
+    for (i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchId) { t = e.changedTouches[i]; break; }
+    }
+    touchId = null;
+    if (!t) return;
+    handleSwipe(t.clientX - startX, t.clientY - startY);
+  }, { passive: true });
+
+  boardEl.addEventListener('touchcancel', function () { touchId = null; });
+
+  var mouseDown = false;
+  boardEl.addEventListener('mousedown', function (e) {
+    mouseDown = true;
+    startX = e.clientX;
+    startY = e.clientY;
+  });
+  window.addEventListener('mouseup', function (e) {
+    if (!mouseDown) return;
+    mouseDown = false;
+    handleSwipe(e.clientX - startX, e.clientY - startY);
+  });
+
+  function handleSwipe(dx, dy) {
+    var ax = Math.abs(dx), ay = Math.abs(dy);
+    if (Math.max(ax, ay) < SWIPE_MIN) return;
+    if (ax > ay) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var key = e.key;
+    if (key === 'Escape') {
+      if (sheetOpen) {
+        closeSheet();
+        if (isGameOver()) window.setTimeout(showGameOverSheet, 120);
+        e.preventDefault();
+      }
+      return;
+    }
+    if (key === 'n' || key === 'N') {
+      newGame();
+      e.preventDefault();
+      return;
+    }
+    var dir = null;
+    if (key === 'ArrowUp' || key === 'w' || key === 'W') dir = 'up';
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') dir = 'down';
+    else if (key === 'ArrowLeft' || key === 'a' || key === 'A') dir = 'left';
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') dir = 'right';
+    if (dir) {
+      move(dir);
+      e.preventDefault();
+    }
+  });
+
+  document.getElementById('btnNew').addEventListener('click', newGame);
+  document.getElementById('btnNewTop').addEventListener('click', newGame);
+  document.getElementById('btnShareTop').addEventListener('click', shareResult);
+
+  document.getElementById('btnContinue').addEventListener('click', function () {
+    if (sheetOpen) {
+      closeSheet();
+      if (isGameOver()) window.setTimeout(showGameOverSheet, 120);
+    } else {
+      boardEl.focus();
+      toast('继续挑战，下一目标 2048');
+    }
+  });
+
+  backdrop.addEventListener('click', function () {
+    closeSheet();
+    if (isGameOver()) window.setTimeout(showGameOverSheet, 120);
+  });
+
+  window.addEventListener('contextmenu', function (e) {
+    if (e.target && boardEl.contains(e.target)) e.preventDefault();
+  });
+
+  /* ---------------- boot ---------------- */
+  best = loadBest();
+  newGame();
+})();
+</script>
+
+</body>
+</html>
