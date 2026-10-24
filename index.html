@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<meta name="description" content="1024 — 滑动合并，挑战 1024。">
+<meta name="description" content="1024 — 滑动合并，挑战 1024。支持断点续玩、撤销与复活。">
 <title>1024 · 滑动合并</title>
 <style>
   :root{
@@ -16,7 +16,6 @@
     --ink-light:#F4F0E8;
     --line:#C9C0B3;
     --volt:#FF5A36;
-    --warn:#D88935;
     --gold:#F2C14E;
 
     --gap:8px;
@@ -45,11 +44,9 @@
     -webkit-tap-highlight-color:transparent;
   }
   body{
-    display:flex;
-    justify-content:center;
+    display:flex;justify-content:center;
     touch-action:manipulation;
-    user-select:none;
-    -webkit-user-select:none;
+    user-select:none;-webkit-user-select:none;
   }
 
   .sr-only{
@@ -58,12 +55,8 @@
   }
 
   .app{
-    width:100%;
-    max-width:480px;
-    height:100%;
-    display:flex;
-    flex-direction:column;
-    gap:16px;
+    width:100%;max-width:480px;height:100%;
+    display:flex;flex-direction:column;gap:16px;
     padding:16px 16px 24px;
     padding-top:max(16px, env(safe-area-inset-top));
     padding-bottom:max(24px, env(safe-area-inset-bottom));
@@ -71,12 +64,8 @@
 
   /* ---------- header ---------- */
   .header{
-    height:72px;
-    flex:0 0 72px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
+    height:72px;flex:0 0 72px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
   }
   .brand{display:flex;flex-direction:column;gap:4px;min-width:0}
   .wordmark{
@@ -93,30 +82,42 @@
   .tools{display:flex;gap:8px;flex:0 0 auto}
 
   .icon-btn{
-    width:44px;height:44px;
+    position:relative;
+    width:44px;height:44px;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
     border-radius:2px;
     background:transparent;
     border:1px solid rgba(244,240,232,.22);
     color:var(--ink-light);
     cursor:pointer;
-    transition:background 120ms linear,border-color 120ms linear;
+    transition:background 120ms linear,border-color 120ms linear,opacity 120ms linear;
   }
   .icon-btn:active{background:rgba(244,240,232,.12);border-color:rgba(244,240,232,.42)}
   .icon-btn:focus-visible{outline:2px solid var(--volt);outline-offset:2px}
+  .icon-btn[disabled]{opacity:.32;cursor:default}
+  .icon-btn[disabled]:active{background:transparent;border-color:rgba(244,240,232,.22)}
+  .icon-btn.is-off{color:rgba(244,240,232,.5)}
+
+  .badge{
+    position:absolute;top:1px;right:3px;
+    font-size:10px;font-weight:700;line-height:1;
+    letter-spacing:.02em;
+    color:var(--volt);
+    font-variant-numeric:tabular-nums;
+    pointer-events:none;
+  }
+  .icon-btn[disabled] .badge{color:rgba(244,240,232,.5)}
 
   /* ---------- score rail ---------- */
   .rail{
     height:88px;flex:0 0 88px;
     background:var(--surface);
     border-radius:8px;
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
+    display:grid;grid-template-columns:repeat(3,1fr);
     overflow:hidden;
   }
   .rail-cell{
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:6px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
     border-left:1px solid rgba(244,240,232,.13);
   }
   .rail-cell:first-child{border-left:0}
@@ -127,35 +128,23 @@
   .rail-val{
     font-size:30px;font-weight:700;line-height:32px;
     color:var(--ink-light);
-    font-variant-numeric:tabular-nums;
-    font-feature-settings:"tnum" 1;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
   }
   .rail-val.is-hot{color:var(--volt)}
 
   /* ---------- stage / board ---------- */
-  .stage{
-    flex:1 1 auto;min-height:0;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .board-frame{
-    position:relative;
-    width:var(--board);
-    height:var(--board);
-    flex:0 0 auto;
-  }
+  .stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+  .board-frame{position:relative;width:var(--board);height:var(--board);flex:0 0 auto}
   .tab{
     position:absolute;top:-12px;right:-12px;
     width:22%;aspect-ratio:1/1;
-    background:var(--volt);
-    border-radius:2px;
-    z-index:0;
+    background:var(--volt);border-radius:2px;z-index:0;
   }
   .board{
     position:relative;z-index:1;
     width:100%;height:100%;
     background:var(--field);
-    border-radius:8px;
-    overflow:hidden;
+    border-radius:8px;overflow:hidden;
     touch-action:none;
   }
   .cells{
@@ -170,8 +159,7 @@
 
   /* ---------- tiles ---------- */
   .tile{
-    position:absolute;
-    top:var(--pad);left:var(--pad);
+    position:absolute;top:var(--pad);left:var(--pad);
     width:var(--cell-size);height:var(--cell-size);
     transform:translate(
       calc(var(--x) * (var(--cell-size) + var(--gap))),
@@ -185,16 +173,13 @@
     width:100%;height:100%;
     border-radius:4px;
     display:flex;align-items:center;justify-content:center;
-    background:var(--surface);
-    color:var(--ink-light);
+    background:var(--surface);color:var(--ink-light);
     overflow:hidden;
   }
   .tile-num{
     font-size:calc(var(--cell-size) * .36);
-    font-weight:700;line-height:1;
-    letter-spacing:-.015em;
-    font-variant-numeric:tabular-nums;
-    font-feature-settings:"tnum" 1;
+    font-weight:700;line-height:1;letter-spacing:-.015em;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
   }
   .tile[data-len="5"] .tile-num,
   .tile[data-len="6"] .tile-num,
@@ -225,6 +210,10 @@
     50%{transform:scale(1.08)}
     100%{transform:scale(1)}
   }
+  .tile.is-out .tile-face{animation:out 160ms ease-in forwards}
+  @keyframes out{
+    to{transform:scale(.72);opacity:0}
+  }
   .tile.is-glow .tile-face{animation:glow 220ms ease-out}
   @keyframes glow{
     0%{box-shadow:0 0 0 0 rgba(242,193,78,0)}
@@ -233,8 +222,7 @@
   }
   .cele-sq{
     position:absolute;inset:-3px;
-    background:var(--volt);
-    border-radius:4px;
+    background:var(--volt);border-radius:4px;
     animation:cele 420ms var(--ease-snap) forwards;
   }
   @keyframes cele{
@@ -245,11 +233,17 @@
 
   /* ---------- action band ---------- */
   .actions{flex:0 0 auto;display:flex;flex-direction:column;gap:12px}
+  .meter{display:flex;align-items:center;gap:10px}
+  .steps{
+    font-size:11px;font-weight:700;line-height:14px;
+    letter-spacing:.12em;color:rgba(244,240,232,.5);
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+    white-space:nowrap;
+  }
   .progress{
-    height:2px;width:100%;
+    flex:1 1 auto;height:2px;
     background:rgba(244,240,232,.12);
-    border-radius:2px;
-    overflow:hidden;
+    border-radius:2px;overflow:hidden;
   }
   .progress i{
     display:block;height:100%;width:100%;
@@ -258,26 +252,29 @@
     transform:scaleX(.1);
     transition:transform 160ms linear;
   }
-  .action-row{display:flex;gap:12px}
+  .action-row{display:flex;gap:12px;align-items:stretch}
 
   .btn{
     height:44px;
-    flex:1 1 0;
-    min-width:132px;
+    flex:1 1 0;min-width:132px;
     border-radius:2px;
     font-family:var(--font);
     font-size:14px;font-weight:700;line-height:1;
     letter-spacing:.04em;
     cursor:pointer;
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    transition:transform 90ms var(--ease-snap),background 120ms linear;
+    transition:transform 90ms var(--ease-snap),background 120ms linear,opacity 120ms linear;
   }
   .btn:active{transform:scale(.98)}
   .btn:focus-visible{outline:2px solid var(--volt);outline-offset:3px}
+  .btn:disabled{opacity:.38;cursor:default;transform:none}
   .btn-primary{background:var(--volt);color:#111827;border:0}
   .btn-secondary{
     background:transparent;color:var(--ink-light);
     border:1px solid rgba(244,240,232,.5);
+  }
+  @media (max-width:352px){
+    .btn{min-width:0;font-size:13px}
   }
 
   /* ---------- overlay / sheet ---------- */
@@ -291,10 +288,8 @@
   .sheet{
     position:relative;
     width:min(320px,100%);
-    background:var(--field);
-    color:var(--ink);
-    border:1px solid var(--line);
-    border-radius:2px;
+    background:var(--field);color:var(--ink);
+    border:1px solid var(--line);border-radius:2px;
     box-shadow:0 12px 32px rgba(17,24,39,.24);
     padding:24px 20px 20px;
     display:flex;flex-direction:column;gap:16px;
@@ -324,28 +319,30 @@
   }
   .metric-val.is-hot{color:#D93B21}
   .sheet-actions{display:flex;flex-direction:column;gap:10px}
-  .sheet .btn{width:100%}
+  .sheet .btn{width:100%;height:46px;flex:0 0 auto}
   .sheet .btn-primary{background:var(--volt);color:#111827}
-  .sheet .btn-secondary{
-    background:transparent;color:var(--ink);
-    border:1px solid rgba(32,43,60,.42);
+  .sheet .btn-secondary{background:transparent;color:var(--ink);border:1px solid rgba(32,43,60,.42)}
+  .btn-tertiary{
+    height:44px;width:100%;
+    background:transparent;border:0;
+    color:rgba(32,43,60,.72);
+    font-family:var(--font);font-size:13px;font-weight:700;letter-spacing:.06em;
+    cursor:pointer;border-radius:2px;
   }
+  .btn-tertiary:active{transform:scale(.98)}
+  .btn-tertiary:focus-visible{outline:2px solid var(--volt);outline-offset:2px}
 
   /* ---------- toast ---------- */
   .toast{
     position:fixed;left:50%;bottom:112px;
     transform:translate(-50%,8px);
-    background:var(--surface);
-    color:var(--ink-light);
-    border:1px solid rgba(244,240,232,.18);
-    border-radius:2px;
+    background:var(--surface);color:var(--ink-light);
+    border:1px solid rgba(244,240,232,.18);border-radius:2px;
     padding:10px 16px;
     font-size:12px;line-height:18px;letter-spacing:.06em;
     opacity:0;pointer-events:none;
     transition:opacity 160ms linear,transform 160ms var(--ease-snap);
-    z-index:30;
-    max-width:calc(100vw - 48px);
-    text-align:center;
+    z-index:30;max-width:calc(100vw - 48px);text-align:center;
   }
   .toast.is-on{opacity:1;transform:translate(-50%,0)}
 
@@ -354,12 +351,14 @@
     .tile{transition:none}
     .tile.is-new .tile-face,
     .tile.is-merge .tile-face,
+    .tile.is-out .tile-face,
     .tile.is-glow .tile-face,
     .cele-sq{animation:none !important}
+    .tile.is-out .tile-face{opacity:0}
     .tile.is-glow .tile-face{outline:1px solid var(--volt);outline-offset:2px}
     .sheet{animation:none}
     .progress i{transition:none}
-    .btn:active{transform:none}
+    .btn:active,.btn-tertiary:active{transform:none}
     .toast{transition:opacity 1ms linear}
   }
 </style>
@@ -383,6 +382,13 @@
     </div>
 
     <div class="tools">
+      <button class="icon-btn" id="btnSound" type="button" aria-label="声音与震动，当前开启">
+        <svg id="soundIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 9.5h3l4-3.5v12l-4-3.5H5z"></path>
+          <path d="M16 9.2a4 4 0 0 1 0 5.6"></path>
+          <path d="M18.6 6.8a7.5 7.5 0 0 1 0 10.4"></path>
+        </svg>
+      </button>
       <button class="icon-btn" id="btnNewTop" type="button" aria-label="新游戏">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"></path>
@@ -433,8 +439,18 @@
   </main>
 
   <footer class="actions">
-    <div class="progress" aria-hidden="true"><i id="progressFill"></i></div>
+    <div class="meter">
+      <span class="steps" id="stepsVal">第 0 步</span>
+      <div class="progress" aria-hidden="true"><i id="progressFill"></i></div>
+    </div>
     <div class="action-row">
+      <button class="icon-btn tool" id="btnUndo" type="button" aria-label="撤销一步，剩余 2 次">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9h11a5.5 5.5 0 0 1 0 11H9"></path>
+          <path d="M8 5 4 9l4 4"></path>
+        </svg>
+        <span class="badge" id="undoBadge">2</span>
+      </button>
       <button class="btn btn-primary" id="btnNew" type="button">新游戏</button>
       <button class="btn btn-secondary" id="btnContinue" type="button">继续挑战</button>
     </div>
@@ -460,6 +476,7 @@
     <div class="sheet-actions">
       <button class="btn btn-primary" id="sheetPrimary" type="button"></button>
       <button class="btn btn-secondary" id="sheetSecondary" type="button"></button>
+      <button class="btn-tertiary" id="sheetTertiary" type="button"></button>
     </div>
   </div>
 </div>
@@ -472,9 +489,12 @@
   'use strict';
 
   var SIZE = 4;
-  var DUR_MOVE = 110, DUR_SPAWN = 140, DUR_MERGE = 160, DUR_SCORE = 180, DUR_GLOW = 220;
+  var DUR_MOVE = 110, DUR_SPAWN = 140, DUR_MERGE = 160, DUR_SCORE = 180, DUR_GLOW = 220, DUR_OUT = 160;
   var SWIPE_MIN = 18;
   var BEST_KEY = 'best_1024_score';
+  var STATE_KEY = 'state_1024_v1';
+  var SOUND_KEY = 'sound_1024_v1';
+  var UNDO_MAX = 2;
 
   var VEC = {
     up: [-1, 0],
@@ -491,6 +511,7 @@
   var scoreEl = document.getElementById('scoreVal');
   var bestEl = document.getElementById('bestVal');
   var maxEl = document.getElementById('maxVal');
+  var stepsEl = document.getElementById('stepsVal');
   var progressFill = document.getElementById('progressFill');
   var liveEl = document.getElementById('live');
   var toastEl = document.getElementById('toast');
@@ -505,18 +526,29 @@
   var mVal2 = document.getElementById('mVal2');
   var sheetPrimary = document.getElementById('sheetPrimary');
   var sheetSecondary = document.getElementById('sheetSecondary');
+  var sheetTertiary = document.getElementById('sheetTertiary');
+
+  var undoBtn = document.getElementById('btnUndo');
+  var undoBadge = document.getElementById('undoBadge');
+  var soundBtn = document.getElementById('btnSound');
+  var soundIcon = document.getElementById('soundIcon');
 
   var grid = [];
   var seq = 0;
   var score = 0;
   var best = 0;
   var maxTile = 2;
+  var moves = 0;
+  var undoLeft = UNDO_MAX;
+  var reviveLeft = 1;
+  var undoSnap = null;
   var busy = false;
   var sheetOpen = false;
   var milestoneShown = false;
+  var soundOn = true;
   var toastTimer = null;
 
-  /* ---------------- storage ---------------- */
+  /* ================= storage ================= */
   function loadBest() {
     try {
       var v = window.localStorage.getItem(BEST_KEY);
@@ -528,7 +560,124 @@
     try { window.localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
   }
 
-  /* ---------------- tiles ---------------- */
+  function loadState() {
+    try {
+      var raw = window.localStorage.getItem(STATE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !data.v || data.v.length !== SIZE * SIZE) return null;
+      return data;
+    } catch (e) { return null; }
+  }
+  function saveGame(over) {
+    try {
+      window.localStorage.setItem(STATE_KEY, JSON.stringify({
+        v: currentValues(),
+        score: score,
+        maxTile: maxTile,
+        moves: moves,
+        undoLeft: undoLeft,
+        reviveLeft: reviveLeft,
+        milestoneShown: milestoneShown,
+        over: !!over,
+        ts: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function clearSave() {
+    try { window.localStorage.removeItem(STATE_KEY); } catch (e) {}
+  }
+
+  function loadSound() {
+    try {
+      var v = window.localStorage.getItem(SOUND_KEY);
+      if (v === '0') return false;
+    } catch (e) {}
+    return true;
+  }
+  function saveSound() {
+    try { window.localStorage.setItem(SOUND_KEY, soundOn ? '1' : '0'); } catch (e) {}
+  }
+
+  /* ================= audio ================= */
+  var actx = null;
+
+  function ensureAudio() {
+    if (!soundOn) return null;
+    if (!actx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { actx = new AC(); } catch (e) { actx = null; return null; }
+    }
+    if (actx.state === 'suspended' && actx.resume) {
+      try { actx.resume(); } catch (e) {}
+    }
+    return actx;
+  }
+
+  function tone(freq, dur, type, vol, delay) {
+    var ctx = ensureAudio();
+    if (!ctx) return;
+    try {
+      var t0 = ctx.currentTime + (delay || 0);
+      var osc = ctx.createOscillator();
+      var g = ctx.createGain();
+      osc.type = type || 'triangle';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol || 0.08, t0 + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.03);
+    } catch (e) {}
+  }
+
+  function sound(kind, value) {
+    if (!soundOn) return;
+    if (kind === 'merge') {
+      var step = Math.log(Math.max(2, value || 2)) / Math.LN2;
+      tone(150 + step * 34, 0.085, 'triangle', 0.075);
+    } else if (kind === 'spawn') {
+      tone(320, 0.045, 'square', 0.022);
+    } else if (kind === 'combo') {
+      tone(420, 0.07, 'triangle', 0.07);
+      tone(560, 0.09, 'triangle', 0.07, 0.07);
+    } else if (kind === 'mile') {
+      tone(523, 0.16, 'triangle', 0.09);
+      tone(659, 0.16, 'triangle', 0.09, 0.11);
+      tone(784, 0.26, 'triangle', 0.09, 0.22);
+    } else if (kind === 'over') {
+      tone(196, 0.32, 'sine', 0.1);
+      tone(147, 0.42, 'sine', 0.09, 0.16);
+    } else if (kind === 'revive') {
+      tone(300, 0.1, 'triangle', 0.08);
+      tone(450, 0.14, 'triangle', 0.08, 0.09);
+    } else if (kind === 'undo') {
+      tone(240, 0.09, 'sine', 0.06);
+      tone(180, 0.12, 'sine', 0.06, 0.07);
+    } else if (kind === 'tap') {
+      tone(660, 0.05, 'sine', 0.05);
+    }
+  }
+
+  function vibrate(pattern) {
+    if (!soundOn) return;
+    try {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    } catch (e) {}
+  }
+
+  function renderSoundIcon() {
+    soundBtn.classList.toggle('is-off', !soundOn);
+    soundBtn.setAttribute('aria-label', '声音与震动，当前' + (soundOn ? '开启' : '关闭'));
+    soundIcon.innerHTML = soundOn
+      ? '<path d="M5 9.5h3l4-3.5v12l-4-3.5H5z"></path><path d="M16 9.2a4 4 0 0 1 0 5.6"></path><path d="M18.6 6.8a7.5 7.5 0 0 1 0 10.4"></path>'
+      : '<path d="M5 9.5h3l4-3.5v12l-4-3.5H5z"></path><path d="M16.5 9.5 21 14"></path><path d="M21 9.5 16.5 14"></path>';
+  }
+
+  /* ================= tiles ================= */
   function emptyGrid() {
     var g = [], r, c, row;
     for (r = 0; r < SIZE; r++) {
@@ -570,12 +719,29 @@
     return tile;
   }
 
+  function currentValues() {
+    var v = [], r, c;
+    for (r = 0; r < SIZE; r++) {
+      for (c = 0; c < SIZE; c++) v.push(grid[r][c] ? grid[r][c].value : 0);
+    }
+    return v;
+  }
+
+  function buildFromValues(vals) {
+    var i, r, c;
+    tilesEl.innerHTML = '';
+    grid = emptyGrid();
+    for (i = 0; i < SIZE * SIZE; i++) {
+      r = Math.floor(i / SIZE);
+      c = i % SIZE;
+      if (vals[i] > 0) grid[r][c] = makeTile(vals[i], r, c, false);
+    }
+  }
+
   function spawn() {
     var empty = [], r, c;
     for (r = 0; r < SIZE; r++) {
-      for (c = 0; c < SIZE; c++) {
-        if (!grid[r][c]) empty.push([r, c]);
-      }
+      for (c = 0; c < SIZE; c++) if (!grid[r][c]) empty.push([r, c]);
     }
     if (!empty.length) return null;
     var pick = empty[Math.floor(Math.random() * empty.length)];
@@ -585,11 +751,13 @@
     return tile;
   }
 
-  /* ---------------- hud ---------------- */
+  /* ================= hud ================= */
   function updateHUD() {
     maxEl.textContent = String(maxTile);
     if (maxTile >= 1024) maxEl.classList.add('is-hot');
     else maxEl.classList.remove('is-hot');
+
+    stepsEl.textContent = '第 ' + moves + ' 步';
 
     var p = Math.log(Math.max(2, maxTile)) / Math.LN2 / 10;
     if (p < 0.06) p = 0.06;
@@ -598,12 +766,19 @@
 
     boardEl.setAttribute(
       'aria-label',
-      '1024 游戏棋盘，4 乘 4 网格，当前分数 ' + score + '，最高块 ' + maxTile
+      '1024 游戏棋盘，4 乘 4 网格，当前分数 ' + score + '，最高块 ' + maxTile + '，第 ' + moves + ' 步'
     );
   }
 
+  function updateTools() {
+    undoBadge.textContent = String(undoLeft);
+    var canUndo = undoLeft > 0 && !!undoSnap && !busy;
+    undoBtn.disabled = !canUndo;
+    undoBtn.setAttribute('aria-label', '撤销一步，剩余 ' + undoLeft + ' 次');
+  }
+
   function announce() {
-    liveEl.textContent = '分数 ' + score + '，最高块 ' + maxTile;
+    liveEl.textContent = '分数 ' + score + '，最高块 ' + maxTile + '，第 ' + moves + ' 步';
   }
 
   function addScore(points) {
@@ -635,7 +810,7 @@
     window.requestAnimationFrame(step);
   }
 
-  /* ---------------- toast ---------------- */
+  /* ================= toast ================= */
   function toast(text) {
     toastEl.textContent = text;
     toastEl.classList.add('is-on');
@@ -645,9 +820,18 @@
     }, 1800);
   }
 
-  /* ---------------- sheet ---------------- */
+  function timeAgo(ts) {
+    var d = Date.now() - (ts || Date.now());
+    if (d < 60000) return '刚刚';
+    if (d < 3600000) return Math.floor(d / 60000) + ' 分钟前';
+    if (d < 86400000) return Math.floor(d / 3600000) + ' 小时前';
+    return Math.floor(d / 86400000) + ' 天前';
+  }
+
+  /* ================= sheet ================= */
   function openSheet(config) {
     sheetTitle.textContent = config.title;
+
     if (config.sub) {
       sheetSub.textContent = config.sub;
       sheetSub.style.display = '';
@@ -655,6 +839,7 @@
       sheetSub.textContent = '';
       sheetSub.style.display = 'none';
     }
+
     mLabel1.textContent = config.label1;
     mVal1.textContent = config.value1;
     mLabel2.textContent = config.label2;
@@ -663,19 +848,32 @@
 
     sheetPrimary.textContent = config.primaryLabel;
     sheetSecondary.textContent = config.secondaryLabel;
+    sheetSecondary.style.display = config.secondaryLabel ? '' : 'none';
+
+    if (config.tertiaryLabel) {
+      sheetTertiary.textContent = config.tertiaryLabel;
+      sheetTertiary.style.display = '';
+    } else {
+      sheetTertiary.textContent = '';
+      sheetTertiary.style.display = 'none';
+    }
 
     sheetPrimary.onclick = function () {
       closeSheet();
-      config.onPrimary();
+      if (config.onPrimary) config.onPrimary();
     };
     sheetSecondary.onclick = function () {
       closeSheet();
-      config.onSecondary();
+      if (config.onSecondary) config.onSecondary();
+    };
+    sheetTertiary.onclick = function () {
+      closeSheet();
+      if (config.onTertiary) config.onTertiary();
     };
 
     overlay.hidden = false;
     sheetOpen = true;
-    // restart rise animation
+
     var sheet = overlay.querySelector('.sheet');
     sheet.style.animation = 'none';
     void sheet.offsetWidth;
@@ -685,6 +883,26 @@
   function closeSheet() {
     overlay.hidden = true;
     sheetOpen = false;
+    updateTools();
+  }
+
+  function showResumeSheet(data) {
+    openSheet({
+      title: '继续上一局',
+      sub: '已保存到本机 · 上次 ' + timeAgo(data.ts),
+      label1: '你的分数',
+      value1: String(score),
+      label2: '最高块',
+      value2: String(maxTile),
+      primaryLabel: '继续挑战',
+      secondaryLabel: '从头开始',
+      onPrimary: function () {
+        toast('继续挑战，下一目标 2048');
+      },
+      onSecondary: function () {
+        newGame();
+      }
+    });
   }
 
   function showMilestoneSheet() {
@@ -708,23 +926,45 @@
   }
 
   function showGameOverSheet() {
-    openSheet({
-      title: '本局结束',
-      sub: '和朋友比一比，谁先合成 1024。',
-      label1: '你的分数',
-      value1: String(score),
-      label2: '最高块',
-      value2: String(maxTile),
-      primaryLabel: '再来一局',
-      secondaryLabel: '把结果发给朋友',
-      onPrimary: function () { newGame(); },
-      onSecondary: function () { shareResult(); }
-    });
+    var sub = '本局走了 ' + moves + ' 步。和朋友比一比，谁先合成 1024。';
+
+    if (reviveLeft > 0) {
+      openSheet({
+        title: '本局结束',
+        sub: sub,
+        label1: '你的分数',
+        value1: String(score),
+        label2: '最高块',
+        value2: String(maxTile),
+        primaryLabel: '复活，移除两个方块',
+        secondaryLabel: '再来一局',
+        tertiaryLabel: '把结果发给朋友',
+        onPrimary: function () { revive(); },
+        onSecondary: function () { newGame(); },
+        onTertiary: function () { shareResult(); }
+      });
+    } else {
+      openSheet({
+        title: '本局结束',
+        sub: sub,
+        label1: '你的分数',
+        value1: String(score),
+        label2: '最高块',
+        value2: String(maxTile),
+        primaryLabel: '再来一局',
+        secondaryLabel: '把结果发给朋友',
+        onPrimary: function () { newGame(); },
+        onSecondary: function () { shareResult(); }
+      });
+    }
+    sound('over');
   }
 
-  /* ---------------- celebration ---------------- */
+  /* ================= celebration ================= */
   function celebrate(tile) {
     toast('里程碑 · 1024 达成');
+    sound('mile');
+    vibrate([10, 40, 20]);
 
     if (tile && !isReduced()) {
       var face = tile.el.querySelector('.tile-face');
@@ -746,7 +986,7 @@
     window.setTimeout(showMilestoneSheet, isReduced() ? 0 : 320);
   }
 
-  /* ---------------- game logic ---------------- */
+  /* ================= mechanics ================= */
   function findFarthest(r, c, dr, dc) {
     var pr = r, pc = c, nr, nc;
     while (true) {
@@ -788,6 +1028,13 @@
   function move(dir) {
     if (busy || sheetOpen || !VEC[dir]) return;
 
+    var before = {
+      v: currentValues(),
+      score: score,
+      maxTile: maxTile,
+      moves: moves
+    };
+
     var vector = VEC[dir];
     var dr = vector[0], dc = vector[1];
     var tr = buildTraversals(dr, dc);
@@ -796,7 +1043,7 @@
     var absorbed = [];
     var merged = [];
     var milestoneTile = null;
-    var r, c, i, j;
+    var i, j, r, c;
 
     for (r = 0; r < SIZE; r++) {
       for (c = 0; c < SIZE; c++) {
@@ -842,18 +1089,22 @@
 
     if (!moved) return;
 
+    undoSnap = before;
     busy = true;
+    moves += 1;
+
     var travel = isReduced() ? 0 : DUR_MOVE;
 
     window.setTimeout(function () {
-      var k;
+      var k, t;
 
       for (k = 0; k < absorbed.length; k++) {
         if (absorbed[k].el.parentNode) absorbed[k].el.parentNode.removeChild(absorbed[k].el);
       }
 
+      var topValue = 2;
       for (k = 0; k < merged.length; k++) {
-        var t = merged[k];
+        t = merged[k];
         t.value = t.newValue;
         t.el.setAttribute('data-v', valueKey(t.value));
         t.el.setAttribute('data-len', String(String(t.value).length));
@@ -869,32 +1120,117 @@
         }
 
         if (t.value > maxTile) maxTile = t.value;
+        if (t.value > topValue) topValue = t.value;
         if (t.value >= 1024 && !milestoneShown) milestoneTile = t;
       }
 
+      // 连击：一次滑动合并 3 个以上方块
+      if (merged.length >= 3) {
+        var bonus = (merged.length - 2) * 20;
+        gained += bonus;
+        toast('连击 +' + bonus);
+        sound('combo');
+      } else if (merged.length > 0) {
+        sound('merge', topValue);
+        vibrate(8);
+      }
+
       addScore(gained);
-      spawn();
+
+      var spawned = spawn();
+      if (spawned) sound('spawn');
+
       updateHUD();
+      updateTools();
       busy = false;
 
       if (milestoneTile) {
         milestoneShown = true;
+        saveGame(false);
         celebrate(milestoneTile);
       } else if (isGameOver()) {
+        saveGame(true);
         window.setTimeout(showGameOverSheet, isReduced() ? 0 : 220);
+      } else {
+        saveGame(false);
       }
     }, travel);
   }
 
-  /* ---------------- new game ---------------- */
+  /* ---------- undo ---------- */
+  function undo() {
+    if (busy || sheetOpen || undoLeft <= 0 || !undoSnap) return;
+
+    undoLeft -= 1;
+    buildFromValues(undoSnap.v);
+    score = undoSnap.score;
+    maxTile = undoSnap.maxTile;
+    moves = undoSnap.moves;
+    undoSnap = null;
+
+    scoreEl.textContent = String(score);
+    bestEl.textContent = String(best);
+    updateHUD();
+    updateTools();
+    saveGame(false);
+    announce();
+
+    toast('已撤销一步');
+    sound('undo');
+  }
+
+  /* ---------- revive ---------- */
+  function revive() {
+    if (reviveLeft <= 0) return;
+    reviveLeft = 0;
+
+    var list = [], r, c, i, victims;
+    for (r = 0; r < SIZE; r++) {
+      for (c = 0; c < SIZE; c++) if (grid[r][c]) list.push(grid[r][c]);
+    }
+    if (!list.length) return;
+
+    list.sort(function (a, b) {
+      if (a.value !== b.value) return a.value - b.value;
+      return a.id - b.id;
+    });
+    victims = list.slice(0, Math.min(2, list.length));
+
+    for (i = 0; i < victims.length; i++) {
+      (function (t) {
+        grid[t.r][t.c] = null;
+        t.dead = true;
+        t.el.classList.add('is-out');
+        window.setTimeout(function () {
+          if (t.el.parentNode) t.el.parentNode.removeChild(t.el);
+        }, isReduced() ? 0 : DUR_OUT);
+      })(victims[i]);
+    }
+
+    updateTools();
+    updateHUD();
+    saveGame(false);
+    announce();
+
+    toast('已移除 2 个方块');
+    sound('revive');
+    vibrate([12, 40, 12]);
+  }
+
+  /* ---------- new game ---------- */
   function newGame() {
     tilesEl.innerHTML = '';
     grid = emptyGrid();
     score = 0;
     maxTile = 2;
+    moves = 0;
+    undoLeft = UNDO_MAX;
+    reviveLeft = 1;
+    undoSnap = null;
     busy = false;
     milestoneShown = false;
     closeSheet();
+    clearSave();
 
     scoreEl.textContent = '0';
     bestEl.textContent = String(best);
@@ -902,13 +1238,14 @@
     spawn();
     spawn();
     updateHUD();
+    updateTools();
     announce();
     boardEl.focus();
   }
 
-  /* ---------------- share ---------------- */
+  /* ================= share ================= */
   function shareText() {
-    return '我的 1024 分数：' + score + '，最高块：' + maxTile + '。来一局？';
+    return '我的 1024 分数：' + score + '，最高块：' + maxTile + '，共 ' + moves + ' 步。来一局？';
   }
 
   function copyText(text) {
@@ -950,7 +1287,7 @@
     }
   }
 
-  /* ---------------- input ---------------- */
+  /* ================= input ================= */
   var touchId = null, startX = 0, startY = 0;
 
   boardEl.addEventListener('touchstart', function (e) {
@@ -998,6 +1335,7 @@
 
   document.addEventListener('keydown', function (e) {
     var key = e.key;
+
     if (key === 'Escape') {
       if (sheetOpen) {
         closeSheet();
@@ -1006,25 +1344,41 @@
       }
       return;
     }
+
     if (key === 'n' || key === 'N') {
       newGame();
       e.preventDefault();
       return;
     }
+
+    if (key === 'u' || key === 'U') {
+      undo();
+      e.preventDefault();
+      return;
+    }
+
     var dir = null;
     if (key === 'ArrowUp' || key === 'w' || key === 'W') dir = 'up';
     else if (key === 'ArrowDown' || key === 's' || key === 'S') dir = 'down';
     else if (key === 'ArrowLeft' || key === 'a' || key === 'A') dir = 'left';
     else if (key === 'ArrowRight' || key === 'd' || key === 'D') dir = 'right';
+
     if (dir) {
       move(dir);
       e.preventDefault();
     }
   });
 
-  document.getElementById('btnNew').addEventListener('click', newGame);
-  document.getElementById('btnNewTop').addEventListener('click', newGame);
+  document.getElementById('btnNew').addEventListener('click', function () {
+    newGame();
+    sound('tap');
+  });
+  document.getElementById('btnNewTop').addEventListener('click', function () {
+    newGame();
+    sound('tap');
+  });
   document.getElementById('btnShareTop').addEventListener('click', shareResult);
+  undoBtn.addEventListener('click', undo);
 
   document.getElementById('btnContinue').addEventListener('click', function () {
     if (sheetOpen) {
@@ -1033,6 +1387,20 @@
     } else {
       boardEl.focus();
       toast('继续挑战，下一目标 2048');
+    }
+  });
+
+  soundBtn.addEventListener('click', function () {
+    soundOn = !soundOn;
+    saveSound();
+    renderSoundIcon();
+    if (soundOn) {
+      ensureAudio();
+      sound('tap');
+      vibrate(8);
+      toast('声音与震动已开启');
+    } else {
+      toast('声音与震动已关闭');
     }
   });
 
@@ -1045,9 +1413,58 @@
     if (e.target && boardEl.contains(e.target)) e.preventDefault();
   });
 
-  /* ---------------- boot ---------------- */
+  // 首次手势时解锁音频（浏览器自动播放策略）
+  function unlockAudio() {
+    ensureAudio();
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('mousedown', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  }
+  document.addEventListener('touchstart', unlockAudio, { passive: true });
+  document.addEventListener('mousedown', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+
+  // 页面被切走/关闭时落盘
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && moves > 0) saveGame(isGameOver());
+  });
+  window.addEventListener('pagehide', function () {
+    if (moves > 0) saveGame(isGameOver());
+  });
+
+  /* ================= boot ================= */
   best = loadBest();
-  newGame();
+  soundOn = loadSound();
+  renderSoundIcon();
+
+  var saved = loadState();
+  var hasTiles = false, vi;
+  if (saved) {
+    for (vi = 0; vi < saved.v.length; vi++) {
+      if (saved.v[vi] > 0) { hasTiles = true; break; }
+    }
+  }
+
+  if (saved && hasTiles && !saved.over) {
+    buildFromValues(saved.v);
+    score = saved.score || 0;
+    maxTile = saved.maxTile || 2;
+    moves = saved.moves || 0;
+    undoLeft = typeof saved.undoLeft === 'number' ? saved.undoLeft : UNDO_MAX;
+    reviveLeft = typeof saved.reviveLeft === 'number' ? saved.reviveLeft : 1;
+    milestoneShown = !!saved.milestoneShown;
+    undoSnap = null;
+
+    scoreEl.textContent = String(score);
+    bestEl.textContent = String(best);
+    updateHUD();
+    updateTools();
+    announce();
+    showResumeSheet(saved);
+  } else {
+    if (saved) clearSave();
+    newGame();
+  }
 })();
 </script>
 
